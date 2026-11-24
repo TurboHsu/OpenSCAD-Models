@@ -1,0 +1,51 @@
+{
+  "scad": "screen_fan_mount.scad",
+  "stls": [
+    {
+      "output": "stl/indoor_plate.stl",
+      "defines": { "part": "indoor" }
+    },
+    {
+      "output": "stl/indoor_plate_lean.stl",
+      "defines": { "part": "indoor", "wall_th": 4.5 }
+    },
+    {
+      "output": "stl/outdoor_plate_elbow.stl",
+      "defines": { "part": "outdoor", "outdoor_kind": "flat_elbow" }
+    },
+    {
+      "output": "stl/outdoor_plate_hose75.stl",
+      "defines": { "part": "outdoor", "outdoor_kind": "spigot" }
+    },
+    {
+      "output": "stl/fan_cover.stl",
+      "defines": { "part": "cover" }
+    }
+  ],
+  "previews": [
+    {
+      "output": "preview/assembly.png",
+      "defines": { "part": "assembly" },
+      "camera": "260,-220,180,0,0,0",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/indoor.png",
+      "defines": { "part": "indoor" },
+      "camera": "200,-180,150,0,0,15",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/outdoor_elbow.png",
+      "defines": { "part": "outdoor", "outdoor_kind": "flat_elbow" },
+      "camera": "240,-200,160,20,0,30",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/cover.png",
+      "defines": { "part": "cover" },
+      "camera": "180,-160,130,0,0,0",
+      "imgsize": "900,700"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# Generated preview images
+*.png
+*.jpg
+*.jpeg
+
+# Preserve reference drawings/photos inside ref/
+!**/ref/
+!**/ref/**
+
+# Exclude all 3D mesh files everywhere (including ref_*.stl / ref/*.stl)
+*.stl
+*.3mf
+*.obj
+
+# Machine-local config & preferences (see .env.example and LOCAL.md.example)
+.env
+LOCAL.md
+
+# OpenSCAD & editor backups
+*.scad~
+*.bak
+*.tmp
+
+# Python & OS junk
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db

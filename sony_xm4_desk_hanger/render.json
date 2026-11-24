@@ -1,0 +1,27 @@
+{
+  "scad": "sony_xm4_desk_hanger.scad",
+  "stls": [
+    {
+      "output": "stl/sony_xm4_desk_hanger.stl"
+    }
+  ],
+  "previews": [
+    {
+      "output": "preview/iso.png",
+      "camera": "130,-95,115,10,8,17",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/side.png",
+      "camera": "10,8,200,10,8,17",
+      "projection": "ortho",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/front.png",
+      "camera": "220,5,17,10,5,17",
+      "projection": "ortho",
+      "imgsize": "900,700"
+    }
+  ]
+}

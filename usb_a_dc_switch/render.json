@@ -1,0 +1,40 @@
+{
+  "scad": "usb_a_dc_switch.scad",
+  "stls": [
+    {
+      "output": "stl/body.stl",
+      "defines": { "part": "body" }
+    },
+    {
+      "output": "stl/lid.stl",
+      "defines": { "part": "lid" }
+    }
+  ],
+  "previews": [
+    {
+      "output": "preview/body_iso.png",
+      "defines": { "part": "body" },
+      "camera": "65,-55,45,0,0,10",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/lid_iso.png",
+      "defines": { "part": "lid" },
+      "camera": "60,-50,35,0,0,3",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/assembly.png",
+      "defines": { "part": "assembly" },
+      "camera": "75,-60,45,0,0,10",
+      "imgsize": "900,700"
+    },
+    {
+      "output": "preview/section.png",
+      "defines": { "part": "section" },
+      "camera": "0,-90,10,0,0,10",
+      "projection": "ortho",
+      "imgsize": "900,700"
+    }
+  ]
+}
