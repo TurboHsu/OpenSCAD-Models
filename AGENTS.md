@@ -82,11 +82,12 @@ Models/
 
 > 新建模型或新增部件/变体时，务必同步创建或更新对应目录的 `render.json`。
 
-## 4. Git 跟踪规则
+## 4. Git 跟踪与提交规范
 
 - **不提交**所有 3D 网格文件（`*.stl`、`*.3mf`、`*.obj`，含参考 STL）以及生成的预览图（`*.png`、`*.jpg`），所有产物通过 `render.json` + 渲染脚本一键复现。
 - **保留跟踪**参考图片/图纸：放入 `<model_name>/ref/` 目录的参考图（如尺寸图、实物照片）不会被 `.gitignore` 忽略。
 - **不提交**本机配置文件 `.env` 与 `LOCAL.md`。
+- **自动提交（重要）**：每次完成较大的建模/绘图操作并渲染验证通过后——例如**新建模型**、**按用户需求完成一轮版本迭代（如 V1 → V2、结构调整、尺寸大改）**——都应**自动执行 `git commit`**，记录清晰的提交说明（如 `feat(sony_xm4_desk_hanger): add v1 desk clip hanger`、`feat(xxx): v2 adjust clamp preload and lip height`），以便随时追溯与回滚。
 
 ## 5. OpenSCAD 设计与验证规范
 
