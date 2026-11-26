@@ -109,6 +109,25 @@ Models/
    - **最薄外壁与卡扣余量**：核对卡扣暗槽、避让槽处的剩余外壁厚度，确保 `>= 1.2 mm`（0.4 mm 喷嘴至少 3 圈壁厚），避免外壁透痕或掰断。
    - **参数化开关回归**：若模型包含布尔开关（如工牌孔、亚克力槽等），交付前需验证非默认组合同样能无报错编译且联动尺寸正确。
    - **增量修改红线**：若用户已明确表示某部件正在打印，后续迭代**严禁改动该部件及与其配合的基准接口尺寸**。
+5. **OpenSCAD 内置检查与严格编译规范（OpenSCAD 2026+）**：
+   充分利用 OpenSCAD 原生自带的编译期与几何诊断能力，优先在源头拦截错误：
+   - **严格告警与参数校验**：导出与验证时推荐附带以下开关，确保零告警通过：
+     - `--hardwarnings`：遇到任意 `WARNING`（未定义变量、退化几何、非法布尔、`-D` 传参拼写错误等）立即报错中断（返回非 0），防止静默导出错误部件。
+     - `--check-parameters=true`：严格校验用户自定义 `module` / `function` 的形参名与传参合法性。
+     - `--check-parameter-ranges=true`：严格校验内置图元（如负尺寸、非法圆角/分段数）的参数范围。
+   - **原生 JSON 几何统计（`--summary=all --summary-file=-`）**：
+     - 直接输出包含 `geometry.simple`（必须为 `true`，表示合法简单流形）、`geometry.dimensions`（必须为 `3`）、`geometry.bounding_box.{min,max,size}`（直接核对 `min[2] == 0.0` 贴床与外轮廓尺寸）、`facets`、`vertices` 的 JSON，可零依赖用于自动化回归校验。
+     - 示例（PowerShell）：
+       ```powershell
+       & $env:OPENSCAD_CLI --hardwarnings --check-parameters=true --check-parameter-ranges=true --summary=all --summary-file=- -D 'part=\"body\"' -o out.stl model.scad
+       ```
+   - **预览诊断模式（排查共面闪烁、法向翻转与布尔异常）**：
+     - `--preview=throwntogether`：以 ThrownTogether 模式渲染预览图，负体积/共面 Z-fighting/反向面片会以紫红色高亮暴露，专门排查 `difference()` 缺少 `eps` 裕量导致的薄片残留。
+     - `--render`：渲染预览 PNG 时强制走完整 Manifold/CGAL 布尔求值，避免“预览正常但最终导出 STL 破面”的差异。
+     - `--view=edges` / `--view=axes`：叠加线框边与坐标轴，用于检查薄壁、对齐与极细碎面。
+   - **源码内自检断言（`assert()` / `echo()`）**：
+     - 在 `.scad` 顶部关键衍生尺寸后加入 `assert(...)`（例如 `assert(min_wall >= 1.2, "Outer wall too thin");`），确保参数被修改或切换开关后，任何违反打印壁厚/干涉约束的组合在编译期立刻报错。
+     - 用 `echo(...)` 输出关键总尺寸与间隙摘要，方便渲染日志核对。
 
 ## 6. 渲染命令
 
