@@ -107,22 +107,46 @@ def format_define(key: str, val: Any) -> str:
     return f'{key}="{escaped}"'
 
 
-def run_openscad(openscad: str, args: list[str]) -> None:
+STRICT_FLAGS = [
+    "--hardwarnings",
+    "--check-parameters=true",
+    "--check-parameter-ranges=true",
+]
+
+
+def run_openscad(openscad: str, args: list[str], parse_summary: bool = False) -> None:
     cmd = [openscad, *args]
     print("  >", " ".join(f'"{c}"' if " " in c else c for c in cmd))
     result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.stdout.strip():
-        for line in result.stdout.strip().splitlines():
-            if any(k in line for k in ("Status:", "Facets:", "Vertices:", "WARNING", "ERROR")):
-                print("    ", line)
-    if result.stderr.strip():
-        for line in result.stderr.strip().splitlines():
-            if any(k in line for k in ("Status:", "Facets:", "Vertices:", "WARNING", "ERROR")):
+    json_line: str | None = None
+    for stream in (result.stdout, result.stderr):
+        if not stream.strip():
+            continue
+        for line in stream.strip().splitlines():
+            if parse_summary and line.lstrip().startswith("{"):
+                json_line = line
+            elif any(k in line for k in ("Status:", "Facets:", "Vertices:", "WARNING", "ERROR", "ECHO:")):
                 print("    ", line)
     if result.returncode != 0:
         if result.stderr.strip():
             print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"OpenSCAD exited with code {result.returncode}")
+    if parse_summary and json_line:
+        try:
+            data = json.loads(json_line)
+            geom = data.get("geometry")
+            if geom:
+                bbox = geom.get("bounding_box", {})
+                size = [round(v, 2) for v in bbox.get("size", [])]
+                z_min = round(bbox.get("min", [0, 0, 0])[2], 3)
+                print(
+                    f"    Geometry: simple={geom.get('simple')} dims={geom.get('dimensions')} "
+                    f"facets={geom.get('facets')} size={size} Z_min={z_min:.3f}"
+                )
+                if not geom.get("simple"):
+                    raise RuntimeError("Non-simple / non-manifold geometry detected!")
+        except json.JSONDecodeError:
+            pass
 
 
 def discover_models() -> list[Path]:
@@ -154,22 +178,23 @@ def resolve_config(model_dir: Path) -> dict[str, Any]:
 
 
 def render_model(
-    openscad: str, model_dir: Path, do_stl: bool, do_preview: bool
+    openscad: str, model_dir: Path, do_stl: bool, do_preview: bool, strict: bool = True
 ) -> None:
     print(f"\n=== {model_dir.name} ===")
     cfg = resolve_config(model_dir)
     default_scad = model_dir / cfg["scad"]
+    strict_args = list(STRICT_FLAGS) if strict else []
 
     if do_stl:
         for item in cfg.get("stls", []):
             scad_path = model_dir / item.get("scad", cfg["scad"])
             out_path = model_dir / item["output"]
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            args: list[str] = []
+            args: list[str] = [*strict_args, "--summary=all", "--summary-file=-"]
             for k, v in item.get("defines", {}).items():
                 args.extend(["-D", format_define(k, v)])
             args.extend(["-o", str(out_path), str(scad_path)])
-            run_openscad(openscad, args)
+            run_openscad(openscad, args, parse_summary=True)
 
     if do_preview:
         for item in cfg.get("previews", []):
@@ -177,6 +202,7 @@ def render_model(
             out_path = model_dir / item["output"]
             out_path.parent.mkdir(parents=True, exist_ok=True)
             args = [
+                *strict_args,
                 "--autocenter",
                 "--viewall",
                 f"--imgsize={item.get('imgsize', '900,700')}",
@@ -197,6 +223,7 @@ def main() -> int:
     parser.add_argument("--all", action="store_true", help="Render all model directories.")
     parser.add_argument("--stl-only", action="store_true", help="Only export STL files.")
     parser.add_argument("--preview-only", action="store_true", help="Only render PNG previews.")
+    parser.add_argument("--no-strict", action="store_true", help="Disable strict OpenSCAD warning/parameter checks.")
     parser.add_argument("--openscad", default=None, help="Explicit OpenSCAD CLI path.")
     args = parser.parse_args()
 
@@ -216,7 +243,7 @@ def main() -> int:
         if not target.is_dir():
             print(f"Error: model directory not found: {target}", file=sys.stderr)
             return 1
-        render_model(openscad, target, do_stl=do_stl, do_preview=do_preview)
+        render_model(openscad, target, do_stl=do_stl, do_preview=do_preview, strict=not args.no_strict)
 
     print("\nDone.")
     return 0

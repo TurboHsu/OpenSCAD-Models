@@ -14,6 +14,7 @@ param(
     [switch]$All,
     [switch]$StlOnly,
     [switch]$PreviewOnly,
+    [switch]$NoStrict,
     [string]$OpenScad
 )
 
@@ -85,7 +86,7 @@ function Format-Define {
 }
 
 function Invoke-OpenScad {
-    param([string]$Exe, [string[]]$ScadArgs)
+    param([string]$Exe, [string[]]$ScadArgs, [switch]$ParseSummary)
     Write-Host "  > $Exe $($ScadArgs -join ' ')"
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -95,15 +96,34 @@ function Invoke-OpenScad {
     } finally {
         $ErrorActionPreference = $prevPref
     }
+    $jsonLine = $null
     foreach ($line in $output) {
         $s = $line.ToString()
-        if ($s -match 'Status:|Facets:|Vertices:|WARNING|ERROR') {
+        if ($ParseSummary -and $s.TrimStart().StartsWith("{")) {
+            $jsonLine = $s
+        } elseif ($s -match 'Status:|Facets:|Vertices:|WARNING|ERROR|ECHO:') {
             Write-Host "    $s"
         }
     }
     if ($code -ne 0) {
         $output | ForEach-Object { Write-Host $_.ToString() -ForegroundColor Red }
         throw "OpenSCAD exited with code $code"
+    }
+    if ($ParseSummary -and $jsonLine) {
+        try {
+            $summary = $jsonLine | ConvertFrom-Json
+            if ($summary.geometry) {
+                $g = $summary.geometry
+                $sz = $g.bounding_box.size | ForEach-Object { [math]::Round($_, 2) }
+                $zmin = [math]::Round($g.bounding_box.min[2], 3)
+                Write-Host ("    Geometry: simple={0} dims={1} facets={2} size=[{3}] Z_min={4:F3}" -f $g.simple, $g.dimensions, $g.facets, ($sz -join ", "), $zmin)
+                if (-not $g.simple) {
+                    throw "Non-simple / non-manifold geometry detected!"
+                }
+            }
+        } catch {
+            if ($_.Exception.Message -match "Non-simple") { throw }
+        }
     }
 }
 
@@ -159,6 +179,8 @@ foreach ($dir in $Targets) {
         $previews = $DefaultPreviews | ForEach-Object { [PSCustomObject]$_ }
     }
 
+    $StrictFlags = if ($NoStrict) { @() } else { @("--hardwarnings", "--check-parameters=true", "--check-parameter-ranges=true") }
+
     if ($DoStl) {
         foreach ($item in $stls) {
             $scadName = if ($item.PSObject.Properties.Name -contains "scad" -and $item.scad) { $item.scad } else { $defaultScad }
@@ -167,14 +189,14 @@ foreach ($dir in $Targets) {
             $outDir = Split-Path -Parent $outPath
             if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
-            $scadArgs = @()
+            $scadArgs = @() + $StrictFlags + @("--summary=all", "--summary-file=-")
             if ($item.PSObject.Properties.Name -contains "defines" -and $item.defines) {
                 foreach ($prop in $item.defines.PSObject.Properties) {
                     $scadArgs += @("-D", (Format-Define $prop.Name $prop.Value))
                 }
             }
             $scadArgs += @("-o", $outPath, $scadPath)
-            Invoke-OpenScad -Exe $ScadExe -ScadArgs $scadArgs
+            Invoke-OpenScad -Exe $ScadExe -ScadArgs $scadArgs -ParseSummary
         }
     }
 
@@ -187,7 +209,7 @@ foreach ($dir in $Targets) {
             if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
             $imgSize = if ($item.PSObject.Properties.Name -contains "imgsize" -and $item.imgsize) { $item.imgsize } else { "900,700" }
-            $scadArgs = @("--autocenter", "--viewall", "--imgsize=$imgSize")
+            $scadArgs = @() + $StrictFlags + @("--autocenter", "--viewall", "--imgsize=$imgSize")
             if ($item.PSObject.Properties.Name -contains "camera" -and $item.camera) {
                 $scadArgs += "--camera=$($item.camera)"
             }
