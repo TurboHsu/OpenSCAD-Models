@@ -61,7 +61,7 @@ fpc_relief_d    = 1.4;    // Extra depth into top wall (+Y) for FPC fold radius
 win_w           = 57.8;
 win_h           = 81.6;
 win_r           = 3.5;
-win_y_offset    = -2.8;   // Shifted toward -Y (bottom) away from top FPC border
+win_y_offset    = -3.1;   // Matches XZ.SLDPRT active area offset away from top FPC border
 
 // Badge lanyard slot (measured from reference lanyard STL: +5.76 mm, 15.2 x 3.2 mm slot)
 lanyard_ext     = enable_lanyard_hole ? 5.8 : 0.0;
@@ -464,21 +464,43 @@ module dock_body() {
             linear_extrude(height = dock_bot_t + 0.1)
                 rrect2d(bot_lip_w, bot_lip_d, bot_lip_r);
 
-        // 3. Support-free 45-deg vaulted internal electronics cavity
-        cav_w_bot = bot_lip_w - 4.0;
-        cav_d_bot = bot_lip_d - 4.0;
-        cav_r_bot = max(2.0, bot_lip_r - 2.0);
-        cav_z_top = well_floor_z - well_floor_t - 0.6; // 9.0 mm -> solid >=2.2 mm tilted floor + 7.0 mm ESP32 headroom
-        vault_shrink = (cav_z_top - dock_bot_t) * 0.9;
+        // 3. Support-free sculpted internal electronics & counterweight cavities (max bridge <= 16 mm!)
+        cav_z_top = well_floor_z - well_floor_t - 0.6; // 9.0 mm -> solid >=2.2 mm tilted floor + 7.0 mm headroom
+
+        // 3a. Rear ESP32-C3 SuperMini bay (22.6 mm wide -> full height to 6.8 mm, then 45-deg taper to 16 mm roof!)
         hull() {
-            translate([0, 0, dock_bot_t - 0.05])
+            translate([0, (bot_lip_d / 2 + 2.0) / 2, dock_bot_t - 0.05])
                 linear_extrude(height = 0.1)
-                    rrect2d(cav_w_bot, cav_d_bot, cav_r_bot);
-            translate([0, 0, cav_z_top])
+                    rrect2d(22.6, bot_lip_d / 2 - 1.6, 2.0);
+            translate([0, (bot_lip_d / 2 + 2.0) / 2, dock_bot_t + 4.8])
                 linear_extrude(height = 0.1)
-                    rrect2d(max(50.0, cav_w_bot - 2 * vault_shrink),
-                            max(22.0, cav_d_bot - 2 * vault_shrink),
-                            max(2.0, cav_r_bot - vault_shrink));
+                    rrect2d(22.6, bot_lip_d / 2 - 1.6, 2.0);
+            translate([0, (bot_lip_d / 2 + 2.0) / 2, cav_z_top])
+                linear_extrude(height = 0.1)
+                    rrect2d(16.0, bot_lip_d / 2 - 4.0, 2.0);
+        }
+
+        // 3b. Center pin-header & wire-routing channel (15 mm front-to-back -> 45-deg taper to 10 mm roof!)
+        hull() {
+            translate([-2.5, -2.5, dock_bot_t - 0.05])
+                linear_extrude(height = 0.1)
+                    rrect2d(48.0, 15.5, 2.0);
+            translate([-2.5, -2.5, dock_bot_t + 4.2])
+                linear_extrude(height = 0.1)
+                    rrect2d(48.0, 15.5, 2.0);
+            translate([-2.5, -2.5, cav_z_top])
+                linear_extrude(height = 0.1)
+                    rrect2d(44.0, 10.5, 2.0);
+        }
+
+        // 3c. 2x Front counterweight pockets with 45-deg conical domes (ZERO flat overhang!)
+        for (wx = [-17.5, 17.5]) {
+            translate([wx, -10.0, dock_bot_t - 0.05])
+                union() {
+                    cylinder(d = 25.0, h = 2.6);
+                    translate([0, 0, 2.55])
+                        cylinder(d1 = 25.0, d2 = 8.0, h = 7.0);
+                }
         }
 
         // 4. Tilted cradle well for the e-ink slab (15 deg backward tilt)
