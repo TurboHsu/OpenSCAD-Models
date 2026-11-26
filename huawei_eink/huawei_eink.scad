@@ -107,17 +107,17 @@ case_t          = front_face_t + cavity_depth + back_plate_t; // 6.4 mm (6.75 mm
 
 // Back cover nesting rabbet & glue-free PETG snap-fits
 rim_wall        = 1.3;    // Outer rim thickness around back cover
-back_clear      = 0.20;   // PETG fit clearance per side
+back_clear      = 0.15;   // Snug PETG fit clearance per side (tuned slightly tighter)
 back_w          = case_w - 2 * rim_wall - 2 * back_clear;
 back_h          = case_h_base - 2 * rim_wall - 2 * back_clear;
 back_r          = max(1.5, case_r - rim_wall - back_clear);
 
 // Shell snap-fit clip parameters (6 clips: 4 on long sides + 2 on top edge, 45-deg support-free)
 snap_w          = 7.0;    // Width of each snap tab
-snap_t          = 1.0;    // Flex arm thickness (ideal for PETG)
+snap_t          = 1.15;   // Slightly stiffer PETG flex arm for crisper click
 snap_h          = 3.4;    // Arm height rising from back_plate_t
-snap_barb       = 0.45;   // Outward 45-deg catch barb (flexes easily in PETG, leaves >=1.2 mm outer wall)
-snap_inset      = 0.30;   // Inward inset from back_w/2 so outer wall stays >=1.2 mm (3 perimeters)
+snap_barb       = 0.55;   // Slightly deeper 45-deg catch barb (+0.10 mm vs V3)
+snap_inset      = 0.42;   // Inward inset so outer wall still stays >=1.20 mm (3 perimeters)
 snap_side_ys    = [-26.0, 4.0];   // Long-side clip Y positions (clear of PCB & headers)
 snap_top_xs     = [-20.0, 20.0];  // Top-edge clip X positions (clear of 22 mm FPC relief)
 
@@ -160,7 +160,7 @@ usbc_z_center   = 5.2;    // Center Z of ESP32 USB-C port (dock_bot_t 2.0 + PCB 
 // Dock bottom cover plate (with 4 glue-free PETG snap-fits)
 dock_bot_t      = 2.0;    // Bottom plate thickness
 dock_bot_inset  = 3.2;    // Perimeter wall around recessed bottom cover
-dock_bot_clear  = 0.22;   // PETG fit clearance
+dock_bot_clear  = 0.16;   // Snug PETG fit clearance (tuned slightly tighter)
 dock_snap_ys    = [-12.0, 10.0]; // Left/right snap-fit positions on dock_bottom
 
 // -----------------------------------------------------------------------------
@@ -335,19 +335,19 @@ module case_front() {
         for (sx = [-1, 1]) {
             for (sy = snap_side_ys) {
                 translate([sx * (back_w / 2 - snap_inset - snap_t / 2), sy, rabbet_z - snap_h / 2 - 0.2])
-                    cube([snap_t + 0.45, snap_w + 0.6, snap_h + 0.6], center = true);
+                    cube([snap_t + 0.40, snap_w + 0.5, snap_h + 0.5], center = true);
                 translate([sx * (back_w / 2 - snap_inset), sy, rabbet_z])
                     scale([sx, 1, 1])
-                        snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.18);
+                        snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.12);
             }
         }
         // Top-edge clips at X = ±20 mm (clear of central 22 mm FPC relief)
         for (tx = snap_top_xs) {
             translate([tx, back_h / 2 - snap_inset - snap_t / 2, rabbet_z - snap_h / 2 - 0.2])
-                cube([snap_w + 0.6, snap_t + 0.45, snap_h + 0.6], center = true);
+                cube([snap_w + 0.5, snap_t + 0.40, snap_h + 0.5], center = true);
             translate([tx, back_h / 2 - snap_inset, rabbet_z])
                 rotate([0, 0, 90])
-                    snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.18);
+                    snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.12);
         }
 
         // 5. Asymmetric 2x 4-pin female header slots on -Y bottom wall
@@ -524,17 +524,17 @@ module dock_body_upright() {
         // 6. 4 internal snap-fit clearance channels & catch pockets for glue-free dock_bottom assembly
         for (sx = [-1, 1]) {
             for (sy = dock_snap_ys) {
-                translate([sx * (bot_lip_w / 2 - dock_bot_clear - 0.6), sy, dock_bot_t + 2.3])
-                    cube([1.6, 8.6, 4.8], center = true);
-                translate([sx * (bot_lip_w / 2 - dock_bot_clear), sy, dock_bot_t + 3.4])
+                translate([sx * (bot_lip_w / 2 - dock_bot_clear - 0.65), sy, dock_bot_t + 2.3])
+                    cube([1.65, 8.5, 4.8], center = true);
+                translate([sx * (bot_lip_w / 2 - dock_bot_clear), sy, dock_bot_t + 3.3])
                     scale([sx, 1, 1])
                         rotate([90, 0, 0])
-                            linear_extrude(height = 8.6, center = true)
+                            linear_extrude(height = 8.5, center = true)
                                 polygon([
-                                    [-0.6, -1.1],
-                                    [0.85, -0.55],
-                                    [0.85, 0.55],
-                                    [-0.6, 1.1]
+                                    [-0.6, -1.15],
+                                    [0.92, -0.55],
+                                    [0.92, 0.55],
+                                    [-0.6, 1.15]
                                 ]);
             }
         }
@@ -567,12 +567,12 @@ module dock_bottom() {
         // Flat base plate nesting into dock_body
         rbox(plate_w, plate_d, dock_bot_t, plate_r, ch_bot = 0.4, ch_top = 0);
 
-        // 4 glue-free PETG cantilever snap-fit clips along left/right edges
+        // 4 glue-free PETG cantilever snap-fit clips along left/right edges (tuned slightly tighter)
         for (sx = [-1, 1]) {
             for (sy = dock_snap_ys) {
-                translate([sx * (plate_w / 2 - 1.2), sy, dock_bot_t - 0.01])
+                translate([sx * (plate_w / 2 - 1.3), sy, dock_bot_t - 0.01])
                     scale([sx, 1, 1])
-                        snap_clip_x(8.0, 1.2, 4.2, 0.65);
+                        snap_clip_x(8.0, 1.3, 4.2, 0.75);
             }
         }
 
