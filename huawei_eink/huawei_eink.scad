@@ -145,15 +145,17 @@ well_floor_z    = 12.2;   // Height of well floor center above Z = 0
 well_y_center   = -4.0;   // Slightly forward of center so tilted screen balances over base
 well_floor_t    = 2.6;    // Thickness of tilted floor holding the male pin headers
 
-// ESP32-C3 SuperMini / Mini Pro dimensions (22.5 x 18.0 x 4.5 mm)
-esp_len         = 22.5;   // Along Y (USB-C facing rear +Y)
+// ESP32-C3 Mini Pro dimensions (measured from user's board: 25.5 x 18.0 x 4.5 mm)
+esp_len         = 25.5;   // Along Y (USB-C facing rear +Y)
 esp_w           = 18.0;   // Along X
 esp_clear       = 0.30;   // Fit clearance
 esp_rail_h      = 2.6;    // Holding rail height on dock_bottom
 esp_rail_t      = 1.6;    // Holding rail wall thickness
 
-usbc_w          = 14.0;   // Generous rear USB-C cable plug opening width
-usbc_h          = 7.6;    // Rear USB-C cable plug opening height (plus bottom notch -> 8.2 mm total)
+// Sleek rear USB-C port window (just exposes the 9.0 x 3.2 mm Type-C port cleanly!)
+usbc_w          = 11.4;   // Compact rounded-rect port window width
+usbc_h          = 5.0;    // Compact rounded-rect port window height
+usbc_z_center   = 5.2;    // Center Z of ESP32 USB-C port (dock_bot_t 2.0 + PCB 1.6 + port 1.6)
 
 // Dock bottom cover plate (with 4 glue-free PETG snap-fits)
 dock_bot_t      = 2.0;    // Bottom plate thickness
@@ -509,13 +511,15 @@ module dock_body_upright() {
             }
         }
 
-        // 5. Generous Rear USB-C cable opening (+Y face, open to bottom -> ZERO support upside-down!)
-        translate([-usbc_w / 2, dock_d_bot / 2 - 10.0, -0.1])
-            cube([usbc_w, 12.0, dock_bot_t + usbc_h + 0.1]);
+        // 5. Sleek enclosed Rear USB-C port window (+Y face, compact r=1.5 rounded rect -> neat & support-free!)
+        translate([0, dock_d_bot / 2 - 5.0, usbc_z_center])
+            rotate([-90, 0, 0])
+                linear_extrude(height = 10.0)
+                    rrect2d(usbc_w, usbc_h, 1.5);
 
         // 5b. Local rear ESP32-C3 board pocket so USB-C port sits flush against the rear wall
         translate([-(esp_w + 1.4) / 2, bot_lip_d / 2 - 6.0, dock_bot_t - 0.1])
-            cube([esp_w + 1.4, 6.2, 5.2]);
+            cube([esp_w + 1.4, 6.4, 5.4]);
 
         // 6. 4 internal snap-fit clearance channels & catch pockets for glue-free dock_bottom assembly
         for (sx = [-1, 1]) {
@@ -560,14 +564,8 @@ module dock_bottom() {
     esp_y_front = esp_y_rear - esp_pkt_len;
 
     union() {
-        // Flat base plate nesting into dock_body (with rear USB-C plug clearance notch)
-        difference() {
-            rbox(plate_w, plate_d, dock_bot_t, plate_r, ch_bot = 0.4, ch_top = 0);
-
-            // Shallow 0.6 mm relief notch under USB-C plug overmold so bulky cables seat cleanly
-            translate([-usbc_w / 2, plate_d / 2 - 4.0, dock_bot_t - 0.6])
-                cube([usbc_w, 5.0, 1.0]);
-        }
+        // Flat base plate nesting into dock_body
+        rbox(plate_w, plate_d, dock_bot_t, plate_r, ch_bot = 0.4, ch_top = 0);
 
         // 4 glue-free PETG cantilever snap-fit clips along left/right edges
         for (sx = [-1, 1]) {
@@ -578,10 +576,9 @@ module dock_bottom() {
             }
         }
 
-        // ESP32-C3 SuperMini locating cradle (rails stop clear of dock_body's rear vault lip)
-        esp_rail_y_end = (dock_d_bot - 2 * dock_bot_inset - 4.0) / 2 - 2.6; // well inside 45-deg vault
+        // ESP32-C3 Mini Pro (25.5 x 18.0 mm) locating cradle
+        esp_rail_y_end = (dock_d_bot - 2 * dock_bot_inset - 4.0) / 2 - 2.6;
         esp_rail_len   = esp_rail_y_end - esp_y_front;
-        // Single clean U-shaped extrusion -> zero coplanar corner edges!
         translate([0, 0, dock_bot_t - 0.05])
             linear_extrude(height = esp_rail_h + 0.05)
                 difference() {
@@ -591,12 +588,12 @@ module dock_bottom() {
                         square([esp_pkt_w, esp_rail_len + 1.0]);
                 }
 
-        // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 22 mm pockets, clear of 45-deg vault)
-        for (wx = [-17.5, 17.5]) {
-            translate([wx, -10.0, dock_bot_t - 0.01])
+        // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 21 mm pockets, clear of 25.5 mm MCU)
+        for (wx = [-19.5, 19.5]) {
+            translate([wx, -13.5, dock_bot_t - 0.01])
                 difference() {
-                    cylinder(d = 24.0, h = 2.0);
-                    translate([0, 0, -0.1]) cylinder(d = 21.8, h = 2.3);
+                    cylinder(d = 23.0, h = 2.0);
+                    translate([0, 0, -0.1]) cylinder(d = 20.8, h = 2.3);
                 }
         }
     }
