@@ -105,12 +105,20 @@ cavity_depth    = screen_t + acrylic_t + behind_screen_t; // 4.4 mm (4.75 mm w/ 
 back_plate_t    = 1.2;    // Back cover plate thickness
 case_t          = front_face_t + cavity_depth + back_plate_t; // 6.4 mm (6.75 mm w/ acrylic)
 
-// Back cover nesting rabbet (nests inside base frame; unaffected by lanyard extension!)
+// Back cover nesting rabbet & glue-free PETG snap-fits
 rim_wall        = 1.3;    // Outer rim thickness around back cover
-back_clear      = 0.20;   // PETG snap/press fit clearance per side
+back_clear      = 0.20;   // PETG fit clearance per side
 back_w          = case_w - 2 * rim_wall - 2 * back_clear;
 back_h          = case_h_base - 2 * rim_wall - 2 * back_clear;
 back_r          = max(1.5, case_r - rim_wall - back_clear);
+
+// Shell snap-fit clip parameters (6 clips: 4 on long sides + 2 on top edge, 45-deg support-free)
+snap_w          = 7.0;    // Width of each snap tab
+snap_t          = 1.0;    // Flex arm thickness (ideal for PETG)
+snap_h          = 3.4;    // Arm height rising from back_plate_t
+snap_barb       = 0.55;   // Outward 45-deg catch barb (flexes easily in PETG)
+snap_side_ys    = [-26.0, 4.0];   // Long-side clip Y positions (clear of PCB & headers)
+snap_top_xs     = [-20.0, 20.0];  // Top-edge clip X positions (clear of 22 mm FPC relief)
 
 // Header Z center measured from shell FRONT face (Z=0) toward BACK face (Z=case_t)
 // Sits flush against inside of back cover (Z = front_face_t + cavity_depth)
@@ -143,13 +151,14 @@ esp_clear       = 0.30;   // Fit clearance
 esp_rail_h      = 2.6;    // Holding rail height on dock_bottom
 esp_rail_t      = 1.6;    // Holding rail wall thickness
 
-usbc_w          = 11.2;   // Rear USB-C cable opening width
-usbc_h          = 6.8;    // Rear USB-C cable opening height
+usbc_w          = 14.0;   // Generous rear USB-C cable plug opening width
+usbc_h          = 7.6;    // Rear USB-C cable plug opening height (plus bottom notch -> 8.2 mm total)
 
-// Dock bottom cover plate
+// Dock bottom cover plate (with 4 glue-free PETG snap-fits)
 dock_bot_t      = 2.0;    // Bottom plate thickness
 dock_bot_inset  = 3.2;    // Perimeter wall around recessed bottom cover
 dock_bot_clear  = 0.22;   // PETG fit clearance
+dock_snap_ys    = [-12.0, 10.0]; // Left/right snap-fit positions on dock_bottom
 
 // -----------------------------------------------------------------------------
 // Helper Modules
@@ -228,6 +237,39 @@ module dock_outer_solid(inset = 0, z0 = 0, z1 = dock_h, top_bevel = 2.0, bot_cha
     }
 }
 
+// Support-free 45-deg cantilever snap-fit clip (extends +Z from Z=0, barb protrudes +X)
+module snap_clip_x(w, t, h, barb) {
+    // 2D cross-section in XZ, extruded along Y (centered)
+    rotate([90, 0, 0])
+        linear_extrude(height = w, center = true)
+            polygon([
+                [0, 0],
+                [t, 0],
+                [t, h - 2 * barb - 0.3],
+                [t + barb, h - barb - 0.3],
+                [t + barb, h - barb],
+                [t, h],
+                [0, h]
+            ]);
+}
+
+// Matching support-free snap-catch pocket (cuts into +X wall; 45-deg roof/floor)
+// In case_front (printed face-down), clip enters from +Z toward -Z, so Z is inverted relative to clip!
+module snap_pocket_x(w, depth, h_arm, barb, clear = 0.25) {
+    // Centered in Y, X=0 is inner wall face, cuts into +X by (depth + clear)
+    // Z=0 is the rabbet step where the clip base sits; clip tip reaches Z = -h_arm
+    z_barb_mid = -(h_arm - barb - 0.15);
+    pz_half = barb + 0.35;
+    rotate([90, 0, 0])
+        linear_extrude(height = w + 2 * clear, center = true)
+            polygon([
+                [-0.8, z_barb_mid - pz_half],
+                [depth + clear, z_barb_mid - pz_half + (depth + clear) * 0.45],
+                [depth + clear, z_barb_mid + pz_half - (depth + clear) * 0.45],
+                [-0.8, z_barb_mid + pz_half]
+            ]);
+}
+
 // =============================================================================
 // PART 1: E-Ink Front Frame (case_front)
 // Print orientation: Face-down on Z = 0 (100% support-free!)
@@ -242,6 +284,7 @@ module case_front() {
 
     // Center of outer body shifts +lanyard_ext/2 so bottom edge stays at -case_h_base/2
     outer_y_shift = lanyard_ext / 2;
+    rabbet_z = front_face_t + cavity_depth;
 
     difference() {
         // Outer body with front & back chamfers
@@ -280,9 +323,31 @@ module case_front() {
             cube([fpc_relief_w, fpc_relief_d + 1.0, cavity_depth + back_plate_t + 1.0]);
 
         // 4. Perimeter rabbet for case_back (always aligned to base frame!)
-        translate([0, 0, front_face_t + cavity_depth])
+        translate([0, 0, rabbet_z])
             linear_extrude(height = back_plate_t + 1.0)
                 rrect2d(rabbet_w, rabbet_h, rabbet_r);
+
+        // 4b. Seamless hidden snap-fit clearance channels & catch pockets (4 side + 2 top)
+        // Side clips sit just outside the screen pocket (X = ±back_w/2)
+        for (sx = [-1, 1]) {
+            for (sy = snap_side_ys) {
+                // Vertical clearance slot for clip arm from rabbet_z down by snap_h + 0.4
+                translate([sx * (back_w / 2 - snap_t / 2), sy, rabbet_z - snap_h / 2 - 0.2])
+                    cube([snap_t + 0.5, snap_w + 0.6, snap_h + 0.6], center = true);
+                // Recessed 45-deg catch pocket for outward barb (leaves >=1.0 mm outer wall intact!)
+                translate([sx * (back_w / 2), sy, rabbet_z])
+                    scale([sx, 1, 1])
+                        snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb);
+            }
+        }
+        // Top-edge clips at X = ±20 mm (clear of central 22 mm FPC relief)
+        for (tx = snap_top_xs) {
+            translate([tx, back_h / 2 - snap_t / 2, rabbet_z - snap_h / 2 - 0.2])
+                cube([snap_w + 0.6, snap_t + 0.5, snap_h + 0.6], center = true);
+            translate([tx, back_h / 2, rabbet_z])
+                rotate([0, 0, 90])
+                    snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb);
+        }
 
         // 5. Asymmetric 2x 4-pin female header slots on -Y bottom wall
         // Local X = -hdr_x1, -hdr_x2 so after rotate([90,0,180]) they align with world hdr_x1, hdr_x2!
@@ -305,14 +370,17 @@ module case_front() {
 // =============================================================================
 // PART 2: E-Ink Back Cover (case_back)
 // Print orientation: Back-face-down on Z = 0 (100% support-free!)
-// Features integrated glue-in locating cradles for the 2x 4-pin female headers.
+// Features:
+//   - 6 integrated glue-free PETG cantilever snap-fit clips (4 side + 2 top)
+//   - Integrated glue-in locating cradles for the 2x 4-pin female headers
 // =============================================================================
 module case_back() {
     // Assembled onto case_front via: translate([0, 0, case_t]) rotate([180, 0, 0])
     // Under rotate([180, 0, 0]): local (x, y, z) -> case_front (x, -y, case_t - z)
     // So in local coords of case_back:
     //   - Header edge (-Y in case_front) is at local +Y = +back_h/2
-    //   - Header X matches case_front local X: -hdr_x1 (+17) and -hdr_x2 (-11)
+    //   - Top edge (+Y in case_front) is at local -Y = -back_h/2
+    //   - Side clip Ys are -snap_side_ys!
 
     cradle_wall = 1.0;
     cradle_h    = hdr_slot_w; // 2.65 mm tall walls rising from Z = back_plate_t
@@ -323,18 +391,32 @@ module case_back() {
         difference() {
             rbox(back_w, back_h, back_plate_t, back_r, ch_bot = 0.4, ch_top = 0);
 
-            // Subtle finger-nail pry notch at top edge (assembled +Y -> local -Y)
+            // Subtle finger-nail pry notch at top edge (assembled +Y -> local -Y) for tool-free reopening
             translate([0, -back_h / 2 - 0.5, -0.1])
-                linear_extrude(height = 0.6)
+                linear_extrude(height = 0.7)
                     rrect2d(10.0, 2.4, 1.0);
+        }
+
+        // 4 long-side PETG snap-fit clips (barb protrudes outward along ±X)
+        for (sx = [-1, 1]) {
+            for (sy = snap_side_ys) {
+                translate([sx * (back_w / 2 - snap_t), -sy, back_plate_t - 0.01])
+                    scale([sx, 1, 1])
+                        snap_clip_x(snap_w, snap_t, snap_h, snap_barb);
+            }
+        }
+
+        // 2 top-edge PETG snap-fit clips (assembled +Y -> local -Y, barb protrudes along -Y)
+        for (tx = snap_top_xs) {
+            translate([tx, -back_h / 2 + snap_t, back_plate_t - 0.01])
+                rotate([0, 0, -90])
+                    snap_clip_x(snap_w, snap_t, snap_h, snap_barb);
         }
 
         // Integrated glue-in locating cradles for the two 4-pin female headers
         for (hx = [-hdr_x1, -hdr_x2]) {
-            // Left cradle wall
             translate([hx - hdr_slot_len / 2 - cradle_wall, back_h / 2 - cradle_y_len, back_plate_t - 0.01])
                 cube([cradle_wall, cradle_y_len, cradle_h]);
-            // Right cradle wall
             translate([hx + hdr_slot_len / 2, back_h / 2 - cradle_y_len, back_plate_t - 0.01])
                 cube([cradle_wall, cradle_y_len, cradle_h]);
         }
@@ -417,14 +499,35 @@ module dock_body() {
             }
         }
 
-        // 6. Rear USB-C cutout (+Y face, open to bottom so ZERO overhang/bridge!)
+        // 6. Generous Rear USB-C cable opening (+Y face, open to bottom -> ZERO overhang!)
+        // Fits standard USB-C cable overmolds (14.0 mm wide x 7.6 mm above dock_bottom)
         translate([-usbc_w / 2, dock_d_bot / 2 - 14.0, -0.1])
             cube([usbc_w, 16.0, dock_bot_t + usbc_h + 0.1]);
+
+        // 7. 4 internal snap-fit clearance channels & catch pockets for glue-free dock_bottom assembly
+        for (sx = [-1, 1]) {
+            for (sy = dock_snap_ys) {
+                // Vertical clearance channel for the 1.2 mm snap arm (from bottom up to Z = dock_bot_t + 4.6)
+                translate([sx * (bot_lip_w / 2 - dock_bot_clear - 0.6), sy, dock_bot_t + 2.3])
+                    cube([1.6, 8.6, 4.8], center = true);
+                // 45-deg catch pocket for outward 0.65 mm barb (tip of arm is at Z = dock_bot_t + 4.2)
+                translate([sx * (bot_lip_w / 2 - dock_bot_clear), sy, dock_bot_t + 3.4])
+                    scale([sx, 1, 1])
+                        rotate([90, 0, 0])
+                            linear_extrude(height = 8.6, center = true)
+                                polygon([
+                                    [-0.6, -1.1],
+                                    [0.85, -0.55],
+                                    [0.85, 0.55],
+                                    [-0.6, 1.1]
+                                ]);
+            }
+        }
     }
 }
 
 // =============================================================================
-// PART 4: Dock Bottom Plate with ESP32-C3 SuperMini Cradle (dock_bottom)
+// PART 4: Dock Bottom Plate with ESP32-C3 SuperMini Cradle & Snap-Fits (dock_bottom)
 // Print orientation: Flat on Z = 0 (100% support-free!)
 // =============================================================================
 module dock_bottom() {
@@ -434,18 +537,34 @@ module dock_bottom() {
 
     esp_pkt_w   = esp_w + 2 * esp_clear;     // 18.6 mm
     esp_pkt_len = esp_len + 2 * esp_clear;   // 23.1 mm
-    esp_y_rear  = plate_d / 2 - 1.5;
+    // Seat ESP32-C3 right at the rear edge so USB-C port is flush for effortless cable plugging
+    esp_y_rear  = plate_d / 2 + 0.2;
     esp_y_front = esp_y_rear - esp_pkt_len;
 
     union() {
-        // Flat base plate nesting into dock_body
-        rbox(plate_w, plate_d, dock_bot_t, plate_r, ch_bot = 0.4, ch_top = 0);
+        // Flat base plate nesting into dock_body (with rear USB-C plug clearance notch)
+        difference() {
+            rbox(plate_w, plate_d, dock_bot_t, plate_r, ch_bot = 0.4, ch_top = 0);
+
+            // Shallow 0.6 mm relief notch under USB-C plug overmold so bulky cables seat cleanly
+            translate([-usbc_w / 2, plate_d / 2 - 4.0, dock_bot_t - 0.6])
+                cube([usbc_w, 5.0, 1.0]);
+        }
+
+        // 4 glue-free PETG cantilever snap-fit clips along left/right edges
+        for (sx = [-1, 1]) {
+            for (sy = dock_snap_ys) {
+                translate([sx * (plate_w / 2 - 1.2), sy, dock_bot_t - 0.01])
+                    scale([sx, 1, 1])
+                        snap_clip_x(8.0, 1.2, 4.2, 0.65);
+            }
+        }
 
         // ESP32-C3 SuperMini locating cradle (rear open for USB-C)
         translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_pkt_len + esp_rail_t, esp_rail_h]);
+            cube([esp_rail_t, esp_pkt_len + esp_rail_t - 0.4, esp_rail_h]);
         translate([esp_pkt_w / 2, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_pkt_len + esp_rail_t, esp_rail_h]);
+            cube([esp_rail_t, esp_pkt_len + esp_rail_t - 0.4, esp_rail_h]);
         translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
             cube([esp_pkt_w + 2 * esp_rail_t, esp_rail_t, esp_rail_h]);
 
@@ -482,12 +601,12 @@ module ghost_headers_and_esp() {
 
     // ESP32-C3 SuperMini ghost on dock_bottom
     plate_d = dock_d_bot - 2 * dock_bot_inset - 2 * dock_bot_clear;
-    esp_y_rear = plate_d / 2 - 1.5;
+    esp_y_rear = plate_d / 2 + 0.2;
     color([0.12, 0.45, 0.22])
         translate([-esp_w / 2, esp_y_rear - esp_len, dock_bot_t + 0.2])
             cube([esp_w, esp_len, 1.6]);
     color([0.75, 0.75, 0.78])
-        translate([-4.5, esp_y_rear - 6.0, dock_bot_t + 1.8])
+        translate([-4.5, esp_y_rear - 5.5, dock_bot_t + 1.8])
             cube([9.0, 7.5, 3.2]); // USB-C metal shell
 }
 
