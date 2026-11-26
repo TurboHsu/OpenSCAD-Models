@@ -588,13 +588,16 @@ module dock_bottom() {
 
         // ESP32-C3 SuperMini locating cradle (rails stop clear of dock_body's rear vault lip)
         esp_rail_y_end = (dock_d_bot - 2 * dock_bot_inset - 4.0) / 2 - 2.6; // well inside 45-deg vault
-        esp_rail_len   = esp_rail_y_end - (esp_y_front - esp_rail_t);
-        translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_rail_len, esp_rail_h]);
-        translate([esp_pkt_w / 2, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_rail_len, esp_rail_h]);
-        translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_pkt_w + 2 * esp_rail_t, esp_rail_t, esp_rail_h]);
+        esp_rail_len   = esp_rail_y_end - esp_y_front;
+        // Single clean U-shaped extrusion -> zero coplanar corner edges!
+        translate([0, 0, dock_bot_t - 0.05])
+            linear_extrude(height = esp_rail_h + 0.05)
+                difference() {
+                    translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t])
+                        square([esp_pkt_w + 2 * esp_rail_t, esp_rail_len + esp_rail_t]);
+                    translate([-esp_pkt_w / 2, esp_y_front])
+                        square([esp_pkt_w, esp_rail_len + 1.0]);
+                }
 
         // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 22 mm pockets, clear of 45-deg vault)
         for (wx = [-17.5, 17.5]) {
