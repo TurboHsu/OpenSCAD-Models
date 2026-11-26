@@ -28,7 +28,7 @@ part = "assembly"; // "case_front" | "case_back" | "dock_body" | "dock_bottom" |
 // -----------------------------------------------------------------------------
 // User Parametric Toggles
 // -----------------------------------------------------------------------------
-enable_lanyard_hole = false;   // ON by default: adds badge lanyard slot at top (+Y)
+enable_lanyard_hole = true;   // ON by default: adds badge lanyard slot at top (+Y)
 enable_acrylic      = false;  // OFF by default: adds clearance for 0.3 mm acrylic sheet
 
 $fn = 48;
