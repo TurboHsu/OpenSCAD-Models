@@ -28,7 +28,7 @@ part = "assembly"; // "case_front" | "case_back" | "dock_body" | "dock_bottom" |
 // -----------------------------------------------------------------------------
 // User Parametric Toggles
 // -----------------------------------------------------------------------------
-enable_lanyard_hole = true;   // ON by default: adds badge lanyard slot at top (+Y)
+enable_lanyard_hole = false;   // ON by default: adds badge lanyard slot at top (+Y)
 enable_acrylic      = false;  // OFF by default: adds clearance for 0.3 mm acrylic sheet
 
 $fn = 48;
@@ -126,15 +126,15 @@ snap_top_xs     = [-20.0, 20.0];  // Top-edge clip X positions (clear of 22 mm F
 hdr_z_center    = front_face_t + cavity_depth - hdr_slot_w / 2; // 3.875 mm default
 
 // -----------------------------------------------------------------------------
-// 4. iPod-Style Angled Desktop Dock Parameters
+// 4. iPod-Style Angled Desktop Dock Parameters (Apple iPod Universal Dock look)
 // -----------------------------------------------------------------------------
-dock_w_bot      = 88.0;   // Base width (X)
-dock_d_bot      = 64.0;   // Base depth (Y, front-to-back)
-dock_w_top      = 82.0;   // Top width (subtle iPod-style taper)
-dock_d_top      = 58.0;   // Top depth
+dock_w_bot      = 86.0;   // Base width (X)
+dock_d_bot      = 62.0;   // Base depth (Y, front-to-back)
+dock_w_top      = 84.0;   // Subtle near-vertical iPod Dock sides (1 mm draft/side)
+dock_d_top      = 60.0;   // Subtle near-vertical sides
 dock_h          = 17.2;   // Low-profile iPod dock height -> 100% of active screen exposed!
-dock_r_bot      = 12.0;   // Base corner radius
-dock_r_top      = 10.0;   // Top corner radius
+dock_r_bot      = 11.0;   // Classic Apple rounded corner radius
+dock_r_top      = 10.5;   // Top corner radius
 
 dock_tilt       = 15.0;   // Backward viewing tilt angle (degrees)
 well_clear_xy   = 0.35;   // Per-side slip clearance for smooth one-hand docking
@@ -142,7 +142,7 @@ well_w          = case_w + 2 * well_clear_xy;  // 71.3 mm
 well_t          = case_t + 2 * well_clear_xy;  // 7.1 mm (auto-adjusts w/ acrylic!)
 well_depth      = 5.0;    // Shallow cradle well (~4.3 mm front / ~6.0 mm back) -> full screen visible
 well_floor_z    = 12.2;   // Height of well floor center above Z = 0
-well_y_center   = -4.0;   // Slightly forward of center so tilted screen balances over base
+well_y_center   = -14.0;  // Forward-shifted like real Apple iPod Dock (sleek ~12 mm front lip, spacious rear deck!)
 well_floor_t    = 2.6;    // Thickness of tilted floor holding the male pin headers
 
 // ESP32-C3 Mini Pro dimensions (measured from user's board: 25.5 x 18.0 x 4.5 mm)
@@ -467,18 +467,18 @@ module dock_body_upright() {
 
     difference() {
         union() {
-            // 1. Hollow thin-walled iPod-style outer shell
+            // 1. Hollow thin-walled iPod-style outer shell (crisp 0.8 mm top chamfer like real iPod Dock)
             difference() {
-                dock_outer_solid(inset = 0, z0 = 0, z1 = dock_h, top_bevel = 1.4, bot_chamfer = 0.6);
+                dock_outer_solid(inset = 0, z0 = 0, z1 = dock_h, top_bevel = 0.8, bot_chamfer = 0.6);
 
                 // Clean open hollow interior (2.2 mm top deck, huge wiring & ESP32 space)
                 dock_outer_solid(inset = dock_wall_t, z0 = dock_bot_t - 0.1, z1 = dock_h - dock_top_t,
-                                 top_bevel = 0.8, bot_chamfer = 0);
+                                 top_bevel = 0.6, bot_chamfer = 0);
             }
 
             // 2. Internal reinforced cradle well boss hanging from top deck
             intersection() {
-                dock_outer_solid(inset = 0.01, z0 = 0, z1 = dock_h, top_bevel = 1.4, bot_chamfer = 0.6);
+                dock_outer_solid(inset = 0.01, z0 = 0, z1 = dock_h, top_bevel = 0.8, bot_chamfer = 0.6);
                 dock_slab_transform()
                     translate([0, 0, -well_floor_t])
                         linear_extrude(height = 25.0)
@@ -588,9 +588,9 @@ module dock_bottom() {
                         square([esp_pkt_w, esp_rail_len + 1.0]);
                 }
 
-        // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 21 mm pockets, clear of 25.5 mm MCU)
-        for (wx = [-19.5, 19.5]) {
-            translate([wx, -13.5, dock_bot_t - 0.01])
+        // Optional coin/washer counterweight rings flanking ESP32-C3 in rear half (2x 20.8 mm pockets)
+        for (wx = [-23.5, 23.5]) {
+            translate([wx, 9.0, dock_bot_t - 0.01])
                 difference() {
                     cylinder(d = 23.0, h = 2.0);
                     translate([0, 0, -0.1]) cylinder(d = 20.8, h = 2.3);
