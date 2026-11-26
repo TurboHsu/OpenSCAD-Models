@@ -116,7 +116,8 @@ back_r          = max(1.5, case_r - rim_wall - back_clear);
 snap_w          = 7.0;    // Width of each snap tab
 snap_t          = 1.0;    // Flex arm thickness (ideal for PETG)
 snap_h          = 3.4;    // Arm height rising from back_plate_t
-snap_barb       = 0.55;   // Outward 45-deg catch barb (flexes easily in PETG)
+snap_barb       = 0.45;   // Outward 45-deg catch barb (flexes easily in PETG, leaves >=1.2 mm outer wall)
+snap_inset      = 0.30;   // Inward inset from back_w/2 so outer wall stays >=1.2 mm (3 perimeters)
 snap_side_ys    = [-26.0, 4.0];   // Long-side clip Y positions (clear of PCB & headers)
 snap_top_xs     = [-20.0, 20.0];  // Top-edge clip X positions (clear of 22 mm FPC relief)
 
@@ -328,25 +329,23 @@ module case_front() {
                 rrect2d(rabbet_w, rabbet_h, rabbet_r);
 
         // 4b. Seamless hidden snap-fit clearance channels & catch pockets (4 side + 2 top)
-        // Side clips sit just outside the screen pocket (X = ±back_w/2)
+        // Inset by snap_inset so outer wall stays >=1.2 mm (3 perimeters, invisible outside)
         for (sx = [-1, 1]) {
             for (sy = snap_side_ys) {
-                // Vertical clearance slot for clip arm from rabbet_z down by snap_h + 0.4
-                translate([sx * (back_w / 2 - snap_t / 2), sy, rabbet_z - snap_h / 2 - 0.2])
-                    cube([snap_t + 0.5, snap_w + 0.6, snap_h + 0.6], center = true);
-                // Recessed 45-deg catch pocket for outward barb (leaves >=1.0 mm outer wall intact!)
-                translate([sx * (back_w / 2), sy, rabbet_z])
+                translate([sx * (back_w / 2 - snap_inset - snap_t / 2), sy, rabbet_z - snap_h / 2 - 0.2])
+                    cube([snap_t + 0.45, snap_w + 0.6, snap_h + 0.6], center = true);
+                translate([sx * (back_w / 2 - snap_inset), sy, rabbet_z])
                     scale([sx, 1, 1])
-                        snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb);
+                        snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.18);
             }
         }
         // Top-edge clips at X = ±20 mm (clear of central 22 mm FPC relief)
         for (tx = snap_top_xs) {
-            translate([tx, back_h / 2 - snap_t / 2, rabbet_z - snap_h / 2 - 0.2])
-                cube([snap_w + 0.6, snap_t + 0.5, snap_h + 0.6], center = true);
-            translate([tx, back_h / 2, rabbet_z])
+            translate([tx, back_h / 2 - snap_inset - snap_t / 2, rabbet_z - snap_h / 2 - 0.2])
+                cube([snap_w + 0.6, snap_t + 0.45, snap_h + 0.6], center = true);
+            translate([tx, back_h / 2 - snap_inset, rabbet_z])
                 rotate([0, 0, 90])
-                    snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb);
+                    snap_pocket_x(snap_w, snap_barb, snap_h, snap_barb, clear = 0.18);
         }
 
         // 5. Asymmetric 2x 4-pin female header slots on -Y bottom wall
@@ -384,7 +383,11 @@ module case_back() {
 
     cradle_wall = 1.0;
     cradle_h    = hdr_slot_w; // 2.65 mm tall walls rising from Z = back_plate_t
-    cradle_y_len = hdr_pocket_d - (rim_wall + back_clear); // 7.2 mm inside back_h
+    // Keep cradle walls strictly inside case_front's screen cavity (clear of case_front's bottom wall!)
+    pkt_h_half   = (screen_h + 2 * screen_clear) / 2;       // 45.75 mm
+    cradle_y_top = pkt_h_half - 0.35;                       // 45.40 mm (0.35 mm clear of bottom wall)
+    cradle_y_bot = case_h_base / 2 - hdr_pocket_d;          // 48.8 - 8.7 = 40.1 mm
+    cradle_y_len = cradle_y_top - cradle_y_bot;             // 5.3 mm cradling inside cavity
 
     union() {
         // Main flat back plate (nests inside case_front's rabbet)
@@ -397,10 +400,10 @@ module case_back() {
                     rrect2d(10.0, 2.4, 1.0);
         }
 
-        // 4 long-side PETG snap-fit clips (barb protrudes outward along ±X)
+        // 4 long-side PETG snap-fit clips (inset by snap_inset for strong outer wall)
         for (sx = [-1, 1]) {
             for (sy = snap_side_ys) {
-                translate([sx * (back_w / 2 - snap_t), -sy, back_plate_t - 0.01])
+                translate([sx * (back_w / 2 - snap_inset - snap_t), -sy, back_plate_t - 0.01])
                     scale([sx, 1, 1])
                         snap_clip_x(snap_w, snap_t, snap_h, snap_barb);
             }
@@ -408,16 +411,16 @@ module case_back() {
 
         // 2 top-edge PETG snap-fit clips (assembled +Y -> local -Y, barb protrudes along -Y)
         for (tx = snap_top_xs) {
-            translate([tx, -back_h / 2 + snap_t, back_plate_t - 0.01])
+            translate([tx, -back_h / 2 + snap_inset + snap_t, back_plate_t - 0.01])
                 rotate([0, 0, -90])
                     snap_clip_x(snap_w, snap_t, snap_h, snap_barb);
         }
 
-        // Integrated glue-in locating cradles for the two 4-pin female headers
+        // Integrated glue-in locating cradles for the two 4-pin female headers (clear of front bottom wall)
         for (hx = [-hdr_x1, -hdr_x2]) {
-            translate([hx - hdr_slot_len / 2 - cradle_wall, back_h / 2 - cradle_y_len, back_plate_t - 0.01])
+            translate([hx - hdr_slot_len / 2 - cradle_wall, cradle_y_bot, back_plate_t - 0.01])
                 cube([cradle_wall, cradle_y_len, cradle_h]);
-            translate([hx + hdr_slot_len / 2, back_h / 2 - cradle_y_len, back_plate_t - 0.01])
+            translate([hx + hdr_slot_len / 2, cradle_y_bot, back_plate_t - 0.01])
                 cube([cradle_wall, cradle_y_len, cradle_h]);
         }
 
@@ -479,17 +482,18 @@ module dock_body() {
         }
 
         // 4. Tilted cradle well for the e-ink slab (15 deg backward tilt)
+        // Corner radius = 0.8 mm matches case_front's 0.6 mm chamfer -> ZERO corner collision!
         dock_slab_transform() {
             // Main well pocket
             linear_extrude(height = 40.0)
-                rrect2d(well_w, well_t, 2.2);
+                rrect2d(well_w, well_t, 0.8);
 
             // Crisp lead-in flare at the top rim of the shallow well (keeps lower walls snug)
             translate([0, 0, well_depth - 1.2])
                 hull() {
-                    linear_extrude(height = 0.1) rrect2d(well_w, well_t, 2.2);
+                    linear_extrude(height = 0.1) rrect2d(well_w, well_t, 0.8);
                     translate([0, 0, 2.2])
-                        linear_extrude(height = 0.1) rrect2d(well_w + 2.2, well_t + 2.2, 3.0);
+                        linear_extrude(height = 0.1) rrect2d(well_w + 2.2, well_t + 2.2, 1.8);
                 }
 
             // 5. Asymmetric 2x 4-pin MALE pin header glue-in through-slots in cradle floor
@@ -560,20 +564,22 @@ module dock_bottom() {
             }
         }
 
-        // ESP32-C3 SuperMini locating cradle (rear open for USB-C)
+        // ESP32-C3 SuperMini locating cradle (rails stop clear of dock_body's rear vault lip)
+        esp_rail_y_end = (dock_d_bot - 2 * dock_bot_inset - 4.0) / 2 - 2.6; // well inside 45-deg vault
+        esp_rail_len   = esp_rail_y_end - (esp_y_front - esp_rail_t);
         translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_pkt_len + esp_rail_t - 0.4, esp_rail_h]);
+            cube([esp_rail_t, esp_rail_len, esp_rail_h]);
         translate([esp_pkt_w / 2, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
-            cube([esp_rail_t, esp_pkt_len + esp_rail_t - 0.4, esp_rail_h]);
+            cube([esp_rail_t, esp_rail_len, esp_rail_h]);
         translate([-esp_pkt_w / 2 - esp_rail_t, esp_y_front - esp_rail_t, dock_bot_t - 0.01])
             cube([esp_pkt_w + 2 * esp_rail_t, esp_rail_t, esp_rail_h]);
 
-        // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 22 mm pockets)
-        for (wx = [-18.0, 18.0]) {
-            translate([wx, -13.0, dock_bot_t - 0.01])
+        // Optional coin/washer counterweight rings in front of ESP32-C3 (2x 22 mm pockets, clear of 45-deg vault)
+        for (wx = [-17.5, 17.5]) {
+            translate([wx, -10.0, dock_bot_t - 0.01])
                 difference() {
-                    cylinder(d = 24.4, h = 2.2);
-                    translate([0, 0, -0.1]) cylinder(d = 22.0, h = 2.5);
+                    cylinder(d = 24.0, h = 2.0);
+                    translate([0, 0, -0.1]) cylinder(d = 21.8, h = 2.3);
                 }
         }
     }
