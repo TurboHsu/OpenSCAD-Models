@@ -52,6 +52,10 @@ pcb_clear       = 0.35;   // Extra clearance for PCB protrusion
 // viewer's RIGHT (+X world) corresponds to local -X in case_front!
 pcb_local_side  = -1;     // -1 = local -X (becomes +X right in front view)
 
+// Top FPC fold relief (centered at +Y top edge of screen pocket)
+fpc_relief_w    = 22.0;   // Width of FPC bend clearance pocket
+fpc_relief_d    = 1.4;    // Extra depth into top wall (+Y) for FPC fold radius
+
 // Front viewing window (from XZ.SLDPRT active area: 57.8 x 81.6 mm)
 // FPC + PCB is at +Y (top), so top bezel is wider and bottom bezel is thin.
 win_w           = 57.8;
@@ -90,7 +94,7 @@ hdr_m_slot_w    = 2.85;   // 2.54 mm plastic + clearance
 // 3. E-Ink Shell Parameters (XZ.SLDPRT inspired, ultra-thin 6.4 mm default)
 // -----------------------------------------------------------------------------
 case_w          = 70.6;   // Outer width (leaves ~1.4 mm wall even at 1.85 mm PCB relief)
-case_h_base     = 97.0;   // Base height without lanyard extension (screen centered in this)
+case_h_base     = 97.6;   // Base height without lanyard extension (allows top FPC bend relief)
 case_h_total    = case_h_base + lanyard_ext;
 case_r          = 5.5;    // Outer corner radius
 case_chamfer    = 0.6;    // Front/back perimeter chamfer
@@ -116,10 +120,10 @@ hdr_z_center    = front_face_t + cavity_depth - hdr_slot_w / 2; // 3.875 mm defa
 // 4. iPod-Style Angled Desktop Dock Parameters
 // -----------------------------------------------------------------------------
 dock_w_bot      = 88.0;   // Base width (X)
-dock_d_bot      = 66.0;   // Base depth (Y, front-to-back)
+dock_d_bot      = 64.0;   // Base depth (Y, front-to-back)
 dock_w_top      = 82.0;   // Top width (subtle iPod-style taper)
-dock_d_top      = 60.0;   // Top depth
-dock_h          = 26.0;   // Overall dock height (low-profile desktop stance)
+dock_d_top      = 58.0;   // Top depth
+dock_h          = 17.2;   // Low-profile iPod dock height -> 100% of active screen exposed!
 dock_r_bot      = 12.0;   // Base corner radius
 dock_r_top      = 10.0;   // Top corner radius
 
@@ -127,10 +131,10 @@ dock_tilt       = 15.0;   // Backward viewing tilt angle (degrees)
 well_clear_xy   = 0.35;   // Per-side slip clearance for smooth one-hand docking
 well_w          = case_w + 2 * well_clear_xy;  // 71.3 mm
 well_t          = case_t + 2 * well_clear_xy;  // 7.1 mm (auto-adjusts w/ acrylic!)
-well_depth      = 14.5;   // How deep the e-ink slab sits in the cradle
-well_floor_z    = 13.0;   // Height of well floor center above Z = 0
+well_depth      = 5.0;    // Shallow cradle well (~4.3 mm front / ~6.0 mm back) -> full screen visible
+well_floor_z    = 12.2;   // Height of well floor center above Z = 0
 well_y_center   = -4.0;   // Slightly forward of center so tilted screen balances over base
-well_floor_t    = 3.0;    // Thickness of tilted floor holding the male pin headers
+well_floor_t    = 2.6;    // Thickness of tilted floor holding the male pin headers
 
 // ESP32-C3 SuperMini / Mini Pro dimensions (22.5 x 18.0 x 4.5 mm)
 esp_len         = 22.5;   // Along Y (USB-C facing rear +Y)
@@ -271,6 +275,10 @@ module case_front() {
         translate([pcb_rel_x, pkt_h / 2 - pcb_zone_h, front_face_t + screen_t + acrylic_t - 0.1])
             cube([pcb_rel_w, pcb_zone_h - 1.5, cavity_depth + back_plate_t + 1.0]);
 
+        // 3b. Top FPC ribbon fold relief (centered at +Y top edge of screen pocket)
+        translate([-fpc_relief_w / 2, pkt_h / 2 - 1.0, front_face_t + 0.5])
+            cube([fpc_relief_w, fpc_relief_d + 1.0, cavity_depth + back_plate_t + 1.0]);
+
         // 4. Perimeter rabbet for case_back (always aligned to base frame!)
         translate([0, 0, front_face_t + cavity_depth])
             linear_extrude(height = back_plate_t + 1.0)
@@ -375,7 +383,7 @@ module dock_body() {
         cav_w_bot = bot_lip_w - 4.0;
         cav_d_bot = bot_lip_d - 4.0;
         cav_r_bot = max(2.0, bot_lip_r - 2.0);
-        cav_z_top = well_floor_z - well_floor_t - 0.8; // 9.2 mm -> solid >=2.5 mm tilted well floor + 7.2 mm ESP32 headroom
+        cav_z_top = well_floor_z - well_floor_t - 0.6; // 9.0 mm -> solid >=2.2 mm tilted floor + 7.0 mm ESP32 headroom
         vault_shrink = (cav_z_top - dock_bot_t) * 0.9;
         hull() {
             translate([0, 0, dock_bot_t - 0.05])
@@ -394,12 +402,12 @@ module dock_body() {
             linear_extrude(height = 40.0)
                 rrect2d(well_w, well_t, 2.2);
 
-            // Lead-in flare near the top rim of the well for effortless docking
-            translate([0, 0, well_depth - 2.5])
+            // Crisp lead-in flare at the top rim of the shallow well (keeps lower walls snug)
+            translate([0, 0, well_depth - 1.2])
                 hull() {
                     linear_extrude(height = 0.1) rrect2d(well_w, well_t, 2.2);
-                    translate([0, 0, 4.0])
-                        linear_extrude(height = 0.1) rrect2d(well_w + 3.2, well_t + 3.2, 3.2);
+                    translate([0, 0, 2.2])
+                        linear_extrude(height = 0.1) rrect2d(well_w + 2.2, well_t + 2.2, 3.0);
                 }
 
             // 5. Asymmetric 2x 4-pin MALE pin header glue-in through-slots in cradle floor
