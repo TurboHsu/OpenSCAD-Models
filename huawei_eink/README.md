@@ -4,6 +4,7 @@
 
 - **主参数化源码**：[huawei_eink.scad](huawei_eink.scad)
 - **渲染配置**：[render.json](render.json)
+- **参考原型**：外壳尺寸与工牌/亚克力方案参考了 MakerWorld 开源模型 [华为彩显墨水屏 DIY 拍立得冰箱贴](https://makerworld.com.cn/zh/models/2943459-hua-wei-cai-xian-mo-shui-ping-diypai-li-de-bing-xi#profileId-3454042)，在此基础上使用 OpenSCAD 参数化重绘并改造为低成本 2×4pin 排针防反插 + OK 线走线 + 6 卡扣免胶结构，底座全新设计为 iPod 风格桌面充电/刷新座。
 
 ---
 
