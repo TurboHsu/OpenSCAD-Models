@@ -435,9 +435,11 @@ module case_back() {
 
 // =============================================================================
 // PART 3: iPod-Style Angled Desktop Dock Body (dock_body)
-// Print orientation: Upright on Z = 0 (100% support-free via 45-deg vaulted cavity!)
+// Print orientation: UPSIDE-DOWN on Z = 0 (top face on build plate for silky
+// finish + lightweight hollow thin-walled shell; add minimal support only under
+// the small inverted cradle well floor).
 // =============================================================================
-// Transform from dock world coordinates to tilted e-ink slab frame:
+// Transform from upright dock world coordinates to tilted e-ink slab frame:
 //   X = horizontal across screen (-35.3 .. +35.3, viewer's left-to-right)
 //   Y = thickness of slab (front face at -case_t/2, back face at +case_t/2)
 //   Z = upward along screen (bottom edge of slab at Z = 0)
@@ -447,7 +449,8 @@ module dock_slab_transform() {
             children();
 }
 
-module dock_body() {
+// Upright geometry (used in assembly views and flipped for printing)
+module dock_body_upright() {
     bot_lip_w = dock_w_bot - 2 * dock_bot_inset;
     bot_lip_d = dock_d_bot - 2 * dock_bot_inset;
     bot_lip_r = max(2.0, dock_r_bot - dock_bot_inset);
@@ -455,62 +458,43 @@ module dock_body() {
     // Header center along tilted Y (from front face -case_t/2 toward back +case_t/2)
     hdr_y_in_slab = -case_t / 2 + hdr_z_center; // +0.675 mm (behind center)
 
-    difference() {
-        // 1. Classic Apple iPod-style tapered rounded body
-        dock_outer_solid(inset = 0, z0 = 0, z1 = dock_h, top_bevel = 2.0, bot_chamfer = 0.8);
+    dock_wall_t   = 3.8;            // Uniform hollow shell wall -> leaves ~0.8 mm perimeter stop ledge for dock_bottom
+    dock_top_t    = 2.2;            // Solid top deck thickness
+    well_boss_w   = well_w + 4.8;   // 2.4 mm reinforced cradle walls around well
+    well_boss_t   = well_t + 4.8;
 
-        // 2. Recessed lip at bottom for dock_bottom plate (Z = 0 .. dock_bot_t)
+    difference() {
+        union() {
+            // 1. Hollow thin-walled iPod-style outer shell
+            difference() {
+                dock_outer_solid(inset = 0, z0 = 0, z1 = dock_h, top_bevel = 1.4, bot_chamfer = 0.6);
+
+                // Clean open hollow interior (2.2 mm top deck, huge wiring & ESP32 space)
+                dock_outer_solid(inset = dock_wall_t, z0 = dock_bot_t - 0.1, z1 = dock_h - dock_top_t,
+                                 top_bevel = 0.8, bot_chamfer = 0);
+            }
+
+            // 2. Internal reinforced cradle well boss hanging from top deck
+            intersection() {
+                dock_outer_solid(inset = 0.01, z0 = 0, z1 = dock_h, top_bevel = 1.4, bot_chamfer = 0.6);
+                dock_slab_transform()
+                    translate([0, 0, -well_floor_t])
+                        linear_extrude(height = 25.0)
+                            rrect2d(well_boss_w, well_boss_t, 2.4);
+            }
+        }
+
+        // 3. Recessed lip at bottom for dock_bottom plate (Z = 0 .. dock_bot_t)
         translate([0, 0, -0.1])
             linear_extrude(height = dock_bot_t + 0.1)
                 rrect2d(bot_lip_w, bot_lip_d, bot_lip_r);
 
-        // 3. Support-free sculpted internal electronics & counterweight cavities (max bridge <= 16 mm!)
-        cav_z_top = well_floor_z - well_floor_t - 0.6; // 9.0 mm -> solid >=2.2 mm tilted floor + 7.0 mm headroom
-
-        // 3a. Rear ESP32-C3 SuperMini bay (22.6 mm wide -> full height to 6.8 mm, then 45-deg taper to 16 mm roof!)
-        hull() {
-            translate([0, (bot_lip_d / 2 + 2.0) / 2, dock_bot_t - 0.05])
-                linear_extrude(height = 0.1)
-                    rrect2d(22.6, bot_lip_d / 2 - 1.6, 2.0);
-            translate([0, (bot_lip_d / 2 + 2.0) / 2, dock_bot_t + 4.8])
-                linear_extrude(height = 0.1)
-                    rrect2d(22.6, bot_lip_d / 2 - 1.6, 2.0);
-            translate([0, (bot_lip_d / 2 + 2.0) / 2, cav_z_top])
-                linear_extrude(height = 0.1)
-                    rrect2d(16.0, bot_lip_d / 2 - 4.0, 2.0);
-        }
-
-        // 3b. Center pin-header & wire-routing channel (15 mm front-to-back -> 45-deg taper to 10 mm roof!)
-        hull() {
-            translate([-2.5, -2.5, dock_bot_t - 0.05])
-                linear_extrude(height = 0.1)
-                    rrect2d(48.0, 15.5, 2.0);
-            translate([-2.5, -2.5, dock_bot_t + 4.2])
-                linear_extrude(height = 0.1)
-                    rrect2d(48.0, 15.5, 2.0);
-            translate([-2.5, -2.5, cav_z_top])
-                linear_extrude(height = 0.1)
-                    rrect2d(44.0, 10.5, 2.0);
-        }
-
-        // 3c. 2x Front counterweight pockets with 45-deg conical domes (ZERO flat overhang!)
-        for (wx = [-17.5, 17.5]) {
-            translate([wx, -10.0, dock_bot_t - 0.05])
-                union() {
-                    cylinder(d = 25.0, h = 2.6);
-                    translate([0, 0, 2.55])
-                        cylinder(d1 = 25.0, d2 = 8.0, h = 7.0);
-                }
-        }
-
-        // 4. Tilted cradle well for the e-ink slab (15 deg backward tilt)
-        // Corner radius = 0.8 mm matches case_front's 0.6 mm chamfer -> ZERO corner collision!
+        // 4. Tilted cradle well for the e-ink slab (15 deg backward tilt, r = 0.8 mm)
         dock_slab_transform() {
-            // Main well pocket
             linear_extrude(height = 40.0)
                 rrect2d(well_w, well_t, 0.8);
 
-            // Crisp lead-in flare at the top rim of the shallow well (keeps lower walls snug)
+            // Crisp lead-in flare at the top rim of the shallow well
             translate([0, 0, well_depth - 1.2])
                 hull() {
                     linear_extrude(height = 0.1) rrect2d(well_w, well_t, 0.8);
@@ -518,25 +502,26 @@ module dock_body() {
                         linear_extrude(height = 0.1) rrect2d(well_w + 2.2, well_t + 2.2, 1.8);
                 }
 
-            // 5. Asymmetric 2x 4-pin MALE pin header glue-in through-slots in cradle floor
+            // Asymmetric 2x 4-pin MALE pin header glue-in through-slots in cradle floor
             for (hx = [hdr_x1, hdr_x2]) {
                 translate([hx - hdr_m_slot_len / 2, hdr_y_in_slab - hdr_m_slot_w / 2, -well_floor_t - 4.0])
                     cube([hdr_m_slot_len, hdr_m_slot_w, well_floor_t + 4.5]);
             }
         }
 
-        // 6. Generous Rear USB-C cable opening (+Y face, open to bottom -> ZERO overhang!)
-        // Fits standard USB-C cable overmolds (14.0 mm wide x 7.6 mm above dock_bottom)
-        translate([-usbc_w / 2, dock_d_bot / 2 - 14.0, -0.1])
-            cube([usbc_w, 16.0, dock_bot_t + usbc_h + 0.1]);
+        // 5. Generous Rear USB-C cable opening (+Y face, open to bottom -> ZERO support upside-down!)
+        translate([-usbc_w / 2, dock_d_bot / 2 - 10.0, -0.1])
+            cube([usbc_w, 12.0, dock_bot_t + usbc_h + 0.1]);
 
-        // 7. 4 internal snap-fit clearance channels & catch pockets for glue-free dock_bottom assembly
+        // 5b. Local rear ESP32-C3 board pocket so USB-C port sits flush against the rear wall
+        translate([-(esp_w + 1.4) / 2, bot_lip_d / 2 - 6.0, dock_bot_t - 0.1])
+            cube([esp_w + 1.4, 6.2, 5.2]);
+
+        // 6. 4 internal snap-fit clearance channels & catch pockets for glue-free dock_bottom assembly
         for (sx = [-1, 1]) {
             for (sy = dock_snap_ys) {
-                // Vertical clearance channel for the 1.2 mm snap arm (from bottom up to Z = dock_bot_t + 4.6)
                 translate([sx * (bot_lip_w / 2 - dock_bot_clear - 0.6), sy, dock_bot_t + 2.3])
                     cube([1.6, 8.6, 4.8], center = true);
-                // 45-deg catch pocket for outward 0.65 mm barb (tip of arm is at Z = dock_bot_t + 4.2)
                 translate([sx * (bot_lip_w / 2 - dock_bot_clear), sy, dock_bot_t + 3.4])
                     scale([sx, 1, 1])
                         rotate([90, 0, 0])
@@ -550,6 +535,13 @@ module dock_body() {
             }
         }
     }
+}
+
+// Printable dock_body: flipped upside-down with top face flat on Z = 0!
+module dock_body() {
+    translate([0, 0, dock_h])
+        rotate([180, 0, 0])
+            dock_body_upright();
 }
 
 // =============================================================================
@@ -645,7 +637,7 @@ module ghost_headers_and_esp() {
 // Full Assembly (E-Ink Frame Docked into iPod-Style Dock)
 // =============================================================================
 module assembly_placed() {
-    color([0.92, 0.93, 0.95]) dock_body();
+    color([0.92, 0.93, 0.95]) dock_body_upright();
     color([0.78, 0.80, 0.84]) dock_bottom();
     ghost_headers_and_esp();
 
