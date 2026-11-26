@@ -11,6 +11,7 @@
 *.stl
 *.3mf
 *.obj
+*.SLDPRT
 
 # Machine-local config & preferences (see .env.example and LOCAL.md.example)
 .env
